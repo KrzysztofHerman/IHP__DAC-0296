@@ -5,6 +5,9 @@ on:
     - cron: "0 3 * * *"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   check:
     name: Verify workflow availability
@@ -63,3 +66,19 @@ jobs:
             done
             exit 1
           fi
+
+      - name: Commit synced workflows
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if ! git status --porcelain | grep -q '^ M \|^A '; then
+            echo "No workflow updates to commit."
+            exit 0
+          fi
+
+          git add .github/workflows
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Sync workflows from Open-Silicon-MPW"
+          git push
