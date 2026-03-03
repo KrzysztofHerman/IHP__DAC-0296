@@ -25,24 +25,7 @@ jobs:
           raw_base="https://raw.githubusercontent.com/${TARGET_REPO}/${TARGET_BRANCH}/workflows"
 
           mapfile -t files < <(
-            python3 - "$api_url" <<'PY'
-            import json
-            import sys
-            import urllib.request
-
-            url = sys.argv[1]
-            with urllib.request.urlopen(url) as handle:
-              data = json.load(handle)
-
-            files = []
-            for item in data if isinstance(data, list) else []:
-              name = item.get("name", "")
-              if name.endswith((".yml", ".yaml")):
-                files.append(name)
-
-            for name in sorted(files):
-              print(name)
-            PY
+            python3 -c 'import json,sys,urllib.request;url=sys.argv[1];data=json.load(urllib.request.urlopen(url));files=[item.get("name","") for item in data if isinstance(data,list) and item.get("name","").endswith((".yml",".yaml"))];print("\n".join(sorted(files)))' "$api_url"
           )
 
           if [ ${#files[@]} -eq 0 ]; then
