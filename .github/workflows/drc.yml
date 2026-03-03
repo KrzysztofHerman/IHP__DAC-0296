@@ -40,7 +40,11 @@ jobs:
                         echo "KLayout .deb URL not found in link"
                         exit 1
                     fi
-                    curl -L -o /tmp/klayout_amd64.deb "$KLAYOUT_URL"
+                    curl -fL -o /tmp/klayout_amd64.deb "$KLAYOUT_URL"
+                    if ! dpkg-deb --info /tmp/klayout_amd64.deb >/dev/null 2>&1; then
+                        echo "Downloaded file is not a valid Debian archive"
+                        exit 1
+                    fi
             -   name: Install KLayout
                 run: |
                     sudo dpkg -i /tmp/klayout_amd64.deb || true
