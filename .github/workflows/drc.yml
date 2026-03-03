@@ -32,7 +32,7 @@ jobs:
             -   name: Install system dependencies
                 run: |
                     sudo apt-get update -qq -y
-                    sudo apt-get install -y jq
+                    sudo apt-get install -y jq python3-pip
             -   name: Download latest KLayout (Ubuntu amd64)
                 run: |
                     UBUNTU_VERSION=$(lsb_release -rs | cut -d. -f1)
@@ -51,6 +51,10 @@ jobs:
                     sudo dpkg -i /tmp/klayout_amd64.deb || true
                     sudo apt-get install -f -y
                     klayout -v
+            -   name: Install IHP-Open-PDK Python requirements
+                run: |
+                    python3 -m pip install --upgrade pip
+                    python3 -m pip install -r https://raw.githubusercontent.com/IHP-GmbH/IHP-Open-PDK/main/requirements.txt
             -   name: Fetch IHP DRC deck and dependencies
                 run: |
                     git clone --depth 1 --filter=blob:none --sparse https://github.com/IHP-GmbH/IHP-Open-PDK.git /tmp/ihp-open-pdk
