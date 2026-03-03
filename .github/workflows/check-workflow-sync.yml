@@ -11,7 +11,6 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
   issues: write
 
 jobs:
@@ -65,7 +64,11 @@ jobs:
             for file in "${updated[@]}"; do
               echo "- ${file}"
             done
-            printf 'UPDATED_FILES=%s\n' "${updated[*]}" >> "$GITHUB_ENV"
+            {
+              echo "UPDATED_FILES<<EOF"
+              printf '%s\n' "${updated[@]}"
+              echo "EOF"
+            } >> "$GITHUB_ENV"
           fi
 
           if [ ${#missing[@]} -ne 0 ]; then
@@ -75,6 +78,29 @@ jobs:
             done
             exit 1
           fi
+
+      - name: Commit staged workflows
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          dest_dir="${DEST_DIR:-.github/workflows-staged}"
+
+          if [ -z "${UPDATED_FILES:-}" ]; then
+            echo "No workflow updates to commit."
+            exit 0
+          fi
+
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "No changes detected after staging."
+            exit 0
+          fi
+
+          git add "$dest_dir"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Stage workflows from Open-Silicon-MPW"
+          git push
 
       - name: Create or update sync issue
         shell: bash
