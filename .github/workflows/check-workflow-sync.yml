@@ -37,14 +37,15 @@ jobs:
             exit 0
           fi
 
-          mkdir -p .github/workflows
+          dest_dir=".github/workflows-staged"
+          mkdir -p "$dest_dir"
 
           missing=()
           updated=()
 
           for file in "${files[@]}"; do
             src_url="${raw_base}/${file}"
-            dest_path=".github/workflows/${file}"
+            dest_path="${dest_dir}/${file}"
 
             if curl -fsSL "$src_url" -o "$dest_path"; then
               updated+=("$file")
@@ -84,20 +85,20 @@ jobs:
           base_branch="${GITHUB_REF_NAME}"
 
           git checkout -b "$branch"
-          git add .github/workflows
+          git add "$dest_dir"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "Sync workflows from Open-Silicon-MPW"
+          git commit -m "Stage workflows from Open-Silicon-MPW"
           git push -u origin "$branch" --force
 
           if gh pr list --head "$branch" --state open --json number --jq 'length' | grep -q '^0$'; then
             gh pr create \
-              --title "Sync workflows from Open-Silicon-MPW" \
-              --body "Automated update of .github/workflows from ${TARGET_REPO}:${TARGET_BRANCH}/workflows." \
+              --title "Stage workflows from Open-Silicon-MPW" \
+              --body "Automated update of ${dest_dir} from ${TARGET_REPO}:${TARGET_BRANCH}/workflows. Copy into .github/workflows manually." \
               --base "$base_branch" \
               --head "$branch"
           else
             gh pr edit "$branch" \
-              --title "Sync workflows from Open-Silicon-MPW" \
-              --body "Automated update of .github/workflows from ${TARGET_REPO}:${TARGET_BRANCH}/workflows."
+              --title "Stage workflows from Open-Silicon-MPW" \
+              --body "Automated update of ${dest_dir} from ${TARGET_REPO}:${TARGET_BRANCH}/workflows. Copy into .github/workflows manually."
           fi
