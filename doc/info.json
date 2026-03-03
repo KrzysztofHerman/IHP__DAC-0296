@@ -12,8 +12,8 @@
   "tools": {},
   "release": {
     "version": "v.1.0.0",
-    "gds": "release/v.1.0.0/gds",
-    "netlist": "release/v.1.0.0/netlist",
+    "gds": "release/v.1.0.0/gds/FMD_QNC_15_WeakInvBGR.gds",
+    "netlist": "release/v.1.0.0/netlist/bandgap_reference.spice",
     "doc": "release/v.1.0.0/doc"
   }
 }
