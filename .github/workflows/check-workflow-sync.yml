@@ -119,10 +119,4 @@ jobs:
           title="Stage workflow updates from Open-Silicon-MPW"
           body=$(printf "New workflow files were staged under %s:\n\n%s\n\nManual action:\nCopy the desired files from %s into .github/workflows to enable them.\n" "$dest_dir" "$UPDATED_FILES" "$dest_dir")
 
-          issue_number=$(gh issue list --search "${title} in:title" --state open --json number --jq '.[0].number')
-
-          if [ -z "${issue_number}" ]; then
-            gh issue create --title "${title}" --body "${body}"
-          else
-            gh issue comment "${issue_number}" --body "${body}"
-          fi
+          gh issue create --title "${title}" --body "${body}"
