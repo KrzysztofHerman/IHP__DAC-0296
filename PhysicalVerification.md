@@ -31,7 +31,23 @@ The workflow installs minimal system packages required by the subsequent steps:
 
 These are installed using `apt-get` on the GitHub-hosted Ubuntu runner.
 
-### 3) KLayout Download (Ubuntu-Matched)
+### 3) Resolve Release Inputs (Early Gate)
+
+Before any tool installation, the workflow inspects `doc/info.json` and resolves:
+
+- `release.gds` (layout)
+- `release.netlist` (schematic)
+
+The logic is strict and defensive:
+
+- If **neither** is referenced, the workflow exits early with a warning and **skips both DRC and LVS**.
+- If a field is referenced but the file does **not** exist, the workflow fails immediately with a clear error.
+- If only `release.gds` is present, **DRC runs** and **LVS is skipped** with a warning.
+- If `release.netlist` is present but `release.gds` is missing, the workflow fails (LVS requires a layout).
+
+This gate prevents expensive tool installs when no verification can be performed.
+
+### 4) KLayout Download (Ubuntu-Matched)
 
 The workflow determines the runner's Ubuntu major version (e.g., 22, 24) using `lsb_release` and then selects a matching KLayout `.deb` URL directly from `https://www.klayout.de/build.html`. This avoids installing a `.deb` built for a newer Ubuntu release, which would fail due to incompatible libc and toolchain dependencies.
 
@@ -40,7 +56,7 @@ Key safety checks performed:
 - If no matching URL is found, the workflow terminates early with a clear error.
 - The downloaded file is validated with `dpkg-deb --info` to ensure it is a legitimate Debian package.
 
-### 4) KLayout Installation
+### 5) KLayout Installation
 
 The workflow installs KLayout using:
 
@@ -49,7 +65,7 @@ The workflow installs KLayout using:
 
 Finally, `klayout -v` is executed to confirm that the executable is available and functional.
 
-### 5) Python Requirements (IHP Open PDK)
+### 6) Python Requirements (IHP Open PDK)
 
 The workflow installs the Python requirements published by the IHP Open PDK:
 
@@ -59,7 +75,7 @@ https://raw.githubusercontent.com/IHP-GmbH/IHP-Open-PDK/main/requirements.txt
 
 These dependencies support the execution of `run_drc.py` and `run_lvs.py` (e.g., `docopt`, `klayout`, `pyyaml`, `gdstk`).
 
-### 6) Fetch Official DRC/LVS Decks
+### 7) Fetch Official DRC/LVS Decks
 
 The workflow clones the official IHP Open PDK repository into `/tmp` using a sparse checkout. Only the required subtrees are downloaded:
 
@@ -69,9 +85,9 @@ The workflow clones the official IHP Open PDK repository into `/tmp` using a spa
 
 This keeps the checkout lightweight and deterministic while ensuring the workflow always uses upstream deck versions.
 
-### 7) DRC Execution (Always)
+### 8) DRC Execution (Conditional)
 
-The workflow reads the GDS path from `doc/info.json` (`release.gds`). If the field is missing or empty, the workflow stops with an error.
+DRC runs only when `release.gds` is present and the referenced file exists. This is determined in the early input gate.
 
 The DRC run is executed as:
 
@@ -88,12 +104,9 @@ Notes:
 - `--precheck_drc` enables the deck’s pre-check phase.
 - Results are written to `/tmp/drc-results`.
 
-### 8) LVS Execution (Conditional)
+### 9) LVS Execution (Conditional)
 
-The workflow reads the netlist path from `doc/info.json` (`release.netlist`).
-
-- If `release.netlist` is missing or `null`, LVS is skipped.
-- If the netlist path is provided but the file does not exist, LVS is skipped with a clear message.
+LVS runs only when both `release.netlist` and `release.gds` are present and the files exist. Otherwise it is skipped or fails early, based on the input gate.
 
 If the netlist is present, LVS is executed as:
 
@@ -104,7 +117,7 @@ python3 /tmp/ihp-open-pdk/ihp-sg13g2/libs.tech/klayout/tech/lvs/run_lvs.py \
   --run_dir=/tmp/lvs-results
 ```
 
-### 9) Artifact Upload
+### 10) Artifact Upload
 
 The workflow always uploads both result directories (even if a stage failed), which simplifies post-mortem debugging:
 
@@ -115,8 +128,9 @@ The workflow always uploads both result directories (even if a stage failed), wh
 
 - **KLayout URL not found**: The workflow exits early if `build.html` does not contain a matching Ubuntu `.deb` link.
 - **Wrong Ubuntu `.deb`**: Detected by dependency errors; the URL must match the runner’s Ubuntu major version.
-- **Missing `release.gds`**: DRC step fails immediately with a clear error.
-- **Missing `release.netlist`**: LVS is skipped intentionally and logged as such.
+- **No release inputs referenced**: The workflow exits early with a warning, skipping DRC/LVS.
+- **Missing `release.gds` file**: The workflow fails early if `release.gds` is referenced but missing.
+- **Missing `release.netlist` file**: The workflow fails early if `release.netlist` is referenced but missing.
 
 ## Design Rationale
 
