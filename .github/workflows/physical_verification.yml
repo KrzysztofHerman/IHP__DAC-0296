@@ -59,30 +59,69 @@ jobs:
                 run: |
                     git clone --depth 1 --filter=blob:none --sparse https://github.com/IHP-GmbH/IHP-Open-PDK.git /tmp/ihp-open-pdk
                     git -C /tmp/ihp-open-pdk sparse-checkout set --no-cone /ihp-sg13g2/libs.tech/klayout/tech/drc/ /ihp-sg13g2/libs.tech/klayout/tech/lvs/ /ihp-sg13g2/libs.tech/klayout/python/sg13g2_pycell_lib/sg13g2_tech_mod.json
-            -   name: Run DRC on release GDS
+            -   name: Resolve release inputs
                 run: |
-                    GDS_PATH=$(jq -r '.release.gds' doc/info.json)
-                    if [[ -z "$GDS_PATH" || "$GDS_PATH" == "null" ]]; then
-                        echo "release.gds not found in doc/info.json"
+                    GDS_PATH=$(jq -r '.release.gds // empty' doc/info.json)
+                    NETLIST_PATH=$(jq -r '.release.netlist // empty' doc/info.json)
+                    GDS_REF=false
+                    NETLIST_REF=false
+                    RUN_DRC=false
+                    RUN_LVS=false
+
+                    if [[ -n "$GDS_PATH" && "$GDS_PATH" != "null" ]]; then
+                        GDS_REF=true
+                    fi
+                    if [[ -n "$NETLIST_PATH" && "$NETLIST_PATH" != "null" ]]; then
+                        NETLIST_REF=true
+                    fi
+
+                    if [[ "$GDS_REF" == false && "$NETLIST_REF" == false ]]; then
+                        echo "::warning::No release.gds or release.netlist referenced in doc/info.json. Skipping DRC and LVS."
+                        echo "run_drc=false" >> "$GITHUB_OUTPUT"
+                        echo "run_lvs=false" >> "$GITHUB_OUTPUT"
+                        exit 0
+                    fi
+
+                    if [[ "$GDS_REF" == true && ! -f "$GDS_PATH" ]]; then
+                        echo "release.gds references a missing file: $GDS_PATH"
                         exit 1
                     fi
+
+                    if [[ "$NETLIST_REF" == true && ! -f "$NETLIST_PATH" ]]; then
+                        echo "release.netlist references a missing file: $NETLIST_PATH"
+                        exit 1
+                    fi
+
+                    if [[ "$NETLIST_REF" == true && "$GDS_REF" == false ]]; then
+                        echo "release.netlist is set but release.gds is missing; LVS requires a layout"
+                        exit 1
+                    fi
+
+                    if [[ "$GDS_REF" == true ]]; then
+                        RUN_DRC=true
+                    fi
+                    if [[ "$NETLIST_REF" == true ]]; then
+                        RUN_LVS=true
+                    else
+                        echo "::warning::release.netlist not set. LVS will be skipped."
+                    fi
+
+                    echo "gds_path=$GDS_PATH" >> "$GITHUB_OUTPUT"
+                    echo "netlist_path=$NETLIST_PATH" >> "$GITHUB_OUTPUT"
+                    echo "run_drc=$RUN_DRC" >> "$GITHUB_OUTPUT"
+                    echo "run_lvs=$RUN_LVS" >> "$GITHUB_OUTPUT"
+                id: resolve-inputs
+            -   name: Run DRC on release GDS
+                if: steps.resolve-inputs.outputs.run_drc == 'true'
+                run: |
                     mkdir -p /tmp/drc-results
-                    python3 /tmp/ihp-open-pdk/ihp-sg13g2/libs.tech/klayout/tech/drc/run_drc.py --path="$GDS_PATH" --run_dir=/tmp/drc-results --mp=1 --precheck_drc
+                    python3 /tmp/ihp-open-pdk/ihp-sg13g2/libs.tech/klayout/tech/drc/run_drc.py --path="${{ steps.resolve-inputs.outputs.gds_path }}" --run_dir=/tmp/drc-results --mp=1 --precheck_drc
                 shell: bash
             -   name: Run LVS on release netlist (if present)
+                if: steps.resolve-inputs.outputs.run_lvs == 'true'
                 run: |
-                    GDS_PATH=$(jq -r '.release.gds' doc/info.json)
-                    NETLIST_PATH=$(jq -r '.release.netlist' doc/info.json)
-                    if [[ -z "$NETLIST_PATH" || "$NETLIST_PATH" == "null" ]]; then
-                        echo "release.netlist not found in doc/info.json, skipping LVS"
-                        exit 0
-                    fi
-                    if [[ ! -f "$NETLIST_PATH" ]]; then
-                        echo "Netlist file not found at $NETLIST_PATH, skipping LVS"
-                        exit 0
-                    fi
                     mkdir -p /tmp/lvs-results
-                    python3 /tmp/ihp-open-pdk/ihp-sg13g2/libs.tech/klayout/tech/lvs/run_lvs.py --layout="$GDS_PATH" --netlist="$NETLIST_PATH" --run_dir=/tmp/lvs-results
+                    python3 /tmp/ihp-open-pdk/ihp-sg13g2/libs.tech/klayout/tech/lvs/run_lvs.py --layout="${{ steps.resolve-inputs.outputs.gds_path }}" --netlist="${{ steps.resolve-inputs.outputs.netlist_path }}" --run_dir=/tmp/lvs-results
                 shell: bash
             -   name: Archive DRC Results
                 uses: actions/upload-artifact@v4
