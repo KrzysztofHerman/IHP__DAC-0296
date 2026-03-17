@@ -12,8 +12,8 @@
   "tools": {},
   "release": {
     "version": "v.1.0.0",
-    "gds": "release/v.1.0.0/gds/FMD_QNC_01_97_GHZ_LINEAR_TIA.gds",
-    "netlist": "release/v.1.0.0/netlist/97_GHZ_LINEAR_TIA.cdl",
+    "gds": "release/v.1.0.0/gds/release.gds",
+    "netlist": "",
     "doc": "release/v.1.0.0/doc"
   }
 }
