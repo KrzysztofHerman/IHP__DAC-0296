@@ -119,7 +119,7 @@ jobs:
                 if: steps.resolve-inputs.outputs.run_drc == 'true'
                 run: |
                     mkdir -p /tmp/drc-results
-                    python3 /tmp/ihp-open-pdk/ihp-sg13g2/libs.tech/klayout/tech/drc/run_drc.py --path="${{ steps.resolve-inputs.outputs.gds_path }}" --run_dir=/tmp/drc-results --mp=8 --precheck_drc --no_offgrids --no_recommended --density_thr=8
+                    python3 /tmp/ihp-open-pdk/ihp-sg13g2/libs.tech/klayout/tech/drc/run_drc.py --path="${{ steps.resolve-inputs.outputs.gds_path }}" --run_dir=/tmp/drc-results --mp=8 --precheck_drc --no_offgrid --no_recommended --density_thr=8
                 shell: bash
             -   name: Run LVS on release netlist (if present)
                 if: steps.resolve-inputs.outputs.run_lvs == 'true'
